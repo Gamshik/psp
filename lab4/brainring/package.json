@@ -1,0 +1,23 @@
+{
+  "name": "brainring",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "concurrently \"pnpm run build:server\" \"pnpm run build:client\"",
+    "build:server": "dotnet build apps/server",
+    "build:client": "turbo run build --filter client --parallel",
+    "dev": "concurrently \"pnpm run dev:server\" \"pnpm run dev:client\"",
+    "dev:server": "dotnet watch run --project apps/server/BrainRing.Server.csproj --urls \"https://localhost:5001;http://localhost:5000\"",
+    "dev:client": "turbo run dev --filter client --parallel",
+    "lint": "turbo run lint"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.19.0",
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "turbo": "^2.5.8"
+  }
+}

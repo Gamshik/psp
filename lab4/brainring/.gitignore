@@ -1,0 +1,17 @@
+# node
+node_modules/
+.pnpm-store/
+pnpm-lock.yaml
+
+# dotnet
+**/bin/
+**/obj/
+
+# next
+apps/client/.next/
+
+# logs
+*.log
+
+# OS
+.DS_Store
