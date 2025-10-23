@@ -2,7 +2,7 @@
 using System.Net;
 using System.Text.Json;
 
-namespace BrainRing.Server.Middleware
+namespace BrainRing.Server.Middlewares
 {
     public class ExceptionHandlerMiddleware
     {

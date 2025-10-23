@@ -1,6 +1,6 @@
 ﻿using BrainRing.Server.WebSockets;
 
-namespace BrainRing.Server.Middleware
+namespace BrainRing.Server.Middlewares
 {
     public class WebSocketMiddleware
     {

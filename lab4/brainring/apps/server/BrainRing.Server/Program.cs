@@ -1,10 +1,23 @@
-using BrainRing.Application.Extensions;
+﻿using BrainRing.Application.Extensions;
 using BrainRing.DbAdapter;
 using BrainRing.DbAdapter.Extensions;
-using BrainRing.Server.Middleware;
+using BrainRing.Server.Middlewares;
 using BrainRing.Server.WebSockets;
 
+var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: MyAllowSpecificOrigins, policy =>
+    {
+        policy.AllowAnyMethod()
+              .AllowAnyHeader()
+              .WithOrigins("http://localhost:3000")
+              .AllowCredentials();
+    });
+});
 
 builder.Services.AddControllers();
 
@@ -22,19 +35,21 @@ builder.Services.AddSingleton<WebSocketHandler>();
 
 var app = builder.Build();
 
-app.MigrateDatabase<BrainRingDbContext>();
-
-app.UseMiddleware<ExceptionHandlerMiddleware>();
-
-app.UseWebSockets();
-app.UseMiddleware<WebSocketMiddleware>();
-
-app.UseHttpsRedirection();
-
 app.UsePathBase("/api");
 
 app.UseRouting();
 
+app.UseCors(MyAllowSpecificOrigins);
+
+app.UseMiddleware<ExceptionHandlerMiddleware>();
+
+app.UseMiddleware<AuthMiddleware>();
+
+app.UseWebSockets();
+app.UseMiddleware<WebSocketMiddleware>();
+
 app.MapControllers();
+
+app.MigrateDatabase<BrainRingDbContext>();
 
 app.Run();
