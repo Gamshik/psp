@@ -9,10 +9,12 @@ namespace BrainRing.Application.Services
     public class QuestionService : IQuestionService
     {
         private readonly IGameSessionsRepository _gameSessionRepo;
+        private readonly IQuestionRepository _questionRepository;
 
-        public QuestionService(IGameSessionsRepository gameSessionRepo)
+        public QuestionService(IGameSessionsRepository gameSessionRepo, IQuestionRepository questionRepository)
         {
             _gameSessionRepo = gameSessionRepo;
+            _questionRepository = questionRepository;
         }
 
         public async Task<QuestionResult> CreateQuestionAsync(CreateQuestionParams @params, CancellationToken token = default)
@@ -23,14 +25,15 @@ namespace BrainRing.Application.Services
 
             var question = new Question
             {
-                Id = Guid.NewGuid(),
                 GameSessionId = session.Id,
                 Text = @params.Text,
                 CorrectOptionIndex = @params.CorrectOptionIndex,
                 Options = @params.Options.Select(o => new QuestionOption { Id = Guid.NewGuid(), Title = o }).ToList()
             };
 
-            session.Questions.Add(question);
+            var newQuestion = await _questionRepository.CreateAsync(question);
+
+            session.Questions.Add(newQuestion);
 
             // Если это первый вопрос, сразу делаем его текущим
             if (session.CurrentQuestionId == null)

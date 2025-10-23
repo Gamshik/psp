@@ -94,6 +94,8 @@ namespace BrainRing.DbAdapter.Repositories.Base
 
                 await SaveChangesAsync(cancellationToken);
 
+                _mapper.Map(dbEntity, entity);
+
                 return entity;
             } 
             catch (DbUpdateException ex)

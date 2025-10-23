@@ -1,6 +1,7 @@
 ﻿using BrainRing.Application.Extensions;
 using BrainRing.DbAdapter;
 using BrainRing.DbAdapter.Extensions;
+using BrainRing.Domain;
 using BrainRing.Server.Middlewares;
 using BrainRing.Server.WebSockets;
 

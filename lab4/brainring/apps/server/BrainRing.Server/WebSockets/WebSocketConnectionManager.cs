@@ -5,29 +5,28 @@ namespace BrainRing.Server.WebSockets
 {
     public class WebSocketConnectionManager
     {
-        private readonly ConcurrentDictionary<string, WebSocket> _sockets = new();
+        private readonly ConcurrentDictionary<string, (WebSocket Socket, Guid UserId, Guid? SessionId)> _sockets = new();
 
-        public string AddSocket(WebSocket socket)
+        public string AddSocket(WebSocket socket, Guid userId, Guid? sessionId)
         {
             var id = Guid.NewGuid().ToString();
-            _sockets.TryAdd(id, socket);
+            _sockets.TryAdd(id, (socket, userId, sessionId));
             return id;
         }
 
-        public WebSocket? GetSocketById(string id)
+        public IEnumerable<KeyValuePair<string, WebSocket>> GetAllBySession(Guid sessionId)
         {
-            _sockets.TryGetValue(id, out var socket);
-            return socket;
+            return _sockets
+                .Where(p => p.Value.SessionId == sessionId)
+                .ToDictionary(k => k.Key, v => v.Value.Socket);
         }
-
-        public IEnumerable<KeyValuePair<string, WebSocket>> GetAll() => _sockets;
 
         public async Task RemoveSocketAsync(string id)
         {
-            if (_sockets.TryRemove(id, out var socket))
+            if (_sockets.TryRemove(id, out var socketInfo))
             {
-                await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closed by server", CancellationToken.None);
-                socket.Dispose();
+                await socketInfo.Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closed by server", CancellationToken.None);
+                socketInfo.Socket.Dispose();
             }
         }
     }

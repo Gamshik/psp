@@ -17,15 +17,28 @@ namespace BrainRing.Server.Middlewares
         {
             if (context.Request.Path == "/ws")
             {
-                if (context.WebSockets.IsWebSocketRequest)
-                {
-                    var socket = await context.WebSockets.AcceptWebSocketAsync();
-                    await _handler.HandleConnectionAsync(socket);
-                }
-                else
+                if (!context.WebSockets.IsWebSocketRequest)
                 {
                     context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    return;
                 }
+
+                if (!context.Request.Cookies.TryGetValue("userId", out var userIdStr) ||
+                    !Guid.TryParse(userIdStr, out var userId))
+                {
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return;
+                }
+
+                Guid? sessionId = null;
+                if (context.Request.Query.TryGetValue("sessionId", out var sessionIdStr) &&
+                    Guid.TryParse(sessionIdStr, out var parsedSessionId))
+                {
+                    sessionId = parsedSessionId;
+                }
+
+                var socket = await context.WebSockets.AcceptWebSocketAsync();
+                await _handler.HandleConnectionAsync(socket, userId, sessionId);
             }
             else
             {
@@ -33,5 +46,4 @@ namespace BrainRing.Server.Middlewares
             }
         }
     }
-
 }
