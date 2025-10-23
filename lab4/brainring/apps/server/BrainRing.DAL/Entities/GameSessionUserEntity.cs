@@ -1,8 +1,9 @@
-﻿namespace BrainRing.DAL.Entities
+﻿using BrainRing.DbAdapter.Entities.Base;
+
+namespace BrainRing.DbAdapter.Entities
 {
-    public class GameSessionUserEntity
+    public class GameSessionUserEntity : BaseEntity
     {
-        // TODO: юзер + сессия = индекс
         public Guid GameSessionId { get; set; }
         public GameSessionEntity GameSession { get; set; }
         public Guid UserId { get; set; }

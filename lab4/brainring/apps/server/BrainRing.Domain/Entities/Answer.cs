@@ -1,8 +1,7 @@
-﻿namespace BrainRing.Domain
+﻿namespace BrainRing.Domain.Entities
 {
-    public class Answer
+    public class Answer : Base.Base
     {
-        public Guid Id { get; set; }
         public Guid UserId { get; set; }
         public Guid QuestionId { get; set; }
         public int SelectedOptionIndex { get; set; }

@@ -1,8 +1,9 @@
-﻿namespace BrainRing.DAL.Entities
+﻿using BrainRing.DbAdapter.Entities.Base;
+
+namespace BrainRing.DbAdapter.Entities
 {
-    public class GameSessionEntity
+    public class GameSessionEntity : BaseEntity
     {
-        public Guid Id { get; set; }
         public Guid HostId { get; set; }
         public UserEntity Host { get; set; }
         public ICollection<GameSessionUserEntity> Participants { get; set; }

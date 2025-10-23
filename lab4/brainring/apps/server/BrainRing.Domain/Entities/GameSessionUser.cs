@@ -1,6 +1,6 @@
-﻿namespace BrainRing.Domain
+﻿namespace BrainRing.Domain.Entities
 {
-    public class GameSessionUser
+    public class GameSessionUser : Base.Base
     {
         public Guid GameSessionId { get; set; }
         public Guid UserId { get; set; }

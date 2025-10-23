@@ -1,10 +1,41 @@
+"use client";
+
 import Image from "next/image";
 import styles from "./page.module.css";
+import { useEffect, useState } from "react";
+
+let socket: WebSocket | null = null;
+
+export function connectWebSocket() {
+  socket = new WebSocket("ws://localhost:5000/ws");
+
+  socket.onopen = () => console.log("✅ Connected to server");
+  socket.onclose = () => console.log("❌ Disconnected");
+  socket.onmessage = (event) => console.log("📩", event.data);
+  socket.onerror = (err) => console.error("⚠️ Error:", err);
+}
+
+export function sendMessage(msg: string) {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(msg);
+  }
+}
 
 export default function Home() {
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    connectWebSocket();
+  }, []);
+
   return (
     <div className={styles.page}>
       <main className={styles.main}>
+        <div style={{ padding: 20 }}>
+          <h1>BrainRing WebSocket Test</h1>
+          <input value={msg} onChange={(e) => setMsg(e.target.value)} />
+          <button onClick={() => sendMessage(msg)}>Send</button>
+        </div>
         <Image
           className={styles.logo}
           src="/next.svg"

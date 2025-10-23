@@ -1,8 +1,7 @@
-﻿using BrainRing.DAL.Configurations;
-using BrainRing.DAL.Entities;
+﻿using BrainRing.DbAdapter.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace BrainRing.DAL
+namespace BrainRing.DbAdapter
 {
     public class BrainRingDbContext : DbContext
     {
@@ -15,9 +14,9 @@ namespace BrainRing.DAL
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            base.OnModelCreating(modelBuilder);
 
-            modelBuilder.ApplyConfiguration(new UsersConfiguration());
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(BrainRingDbContext).Assembly);
+            base.OnModelCreating(modelBuilder);
         }
     }
 }

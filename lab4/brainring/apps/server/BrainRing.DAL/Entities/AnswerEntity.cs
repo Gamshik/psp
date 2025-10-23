@@ -1,10 +1,9 @@
-﻿namespace BrainRing.DAL.Entities
-{
-    public class AnswerEntity
-    {
-        public Guid Id { get; set; }
+﻿using BrainRing.DbAdapter.Entities.Base;
 
-        // TODO: юзер + куэшенс = индекс
+namespace BrainRing.DbAdapter.Entities
+{
+    public class AnswerEntity : BaseEntity
+    {
         public Guid UserId { get; set; }
         public UserEntity User { get; set; }
 

@@ -1,11 +1,11 @@
-﻿namespace BrainRing.Domain
+﻿namespace BrainRing.Domain.Entities
 {
-    public class Question
+    public class Question : Base.Base
     {
-        public Guid Id { get; set; }
         public string Text { get; set; }
         public Guid GameSessionId { get; set; }
         public ICollection<QuestionOption> Options { get; set; }
         public int CorrectOptionIndex { get; set; }
+        public ICollection<Answer> Answers { get; set; }
     }
 }
