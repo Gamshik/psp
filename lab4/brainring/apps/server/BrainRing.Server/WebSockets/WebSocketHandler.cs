@@ -24,39 +24,11 @@ namespace BrainRing.Server.WebSockets
         {
             var socketId = _manager.AddSocket(socket, userId, sessionId);
 
-            using var scope = _scopeFactory.CreateScope();
-            var answerService = scope.ServiceProvider.GetRequiredService<IAnswerService>();
-            var gameSessionService = scope.ServiceProvider.GetRequiredService<IGameSessionService>();
-
             if (sessionId.HasValue)
             {
                 try
                 {
-                    if (!isHost)
-                    {
-                        var joinParams = new JoinGameSessionParams
-                        {
-                            GameSessionId = sessionId.Value,
-                            UserId = userId
-                        };
-
-                        var sessionResult = await gameSessionService.JoinGameSessionAsync(joinParams);
-
-                        await BroadcastToSession(sessionId.Value, new WsMessage
-                        {
-                            Type = MessageType.UpdateParticipants,
-                            Payload = new
-                            {
-                                Participants = sessionResult.Participants,
-                            }
-                        });
-                    } else
-                    {
-                        var session =  await gameSessionService.GetGameSessionAsync(sessionId.Value, CancellationToken.None);
-
-                        if (session == null || !session.IsActive)
-                            throw new Exception("Неверная сессия");
-                    }
+                    await TryConnectToGame(isHost, sessionId, userId);
                 }
                 catch (Exception ex)
                 {
@@ -83,7 +55,7 @@ namespace BrainRing.Server.WebSockets
                             break;
 
                         case MessageType.AnswerResult:
-                            await HandleAnswer(answerService, userId, sessionId!.Value, wsMessage.Payload);
+                            await HandleAnswer(userId, sessionId!.Value, wsMessage.Payload);
                             break;
                     }
                 }
@@ -95,6 +67,49 @@ namespace BrainRing.Server.WebSockets
                 result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
             }
 
+            await LeaveFromGame(isHost, sessionId, userId);
+
+            await _manager.RemoveSocketAsync(socketId);
+        }
+
+        private async Task TryConnectToGame(bool isHost, Guid? sessionId, Guid userId)
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var gameSessionService = scope.ServiceProvider.GetRequiredService<IGameSessionService>();
+
+            if (!isHost)
+            {
+                var joinParams = new JoinGameSessionParams
+                {
+                    GameSessionId = sessionId.Value,
+                    UserId = userId
+                };
+
+                var sessionResult = await gameSessionService.JoinGameSessionAsync(joinParams);
+
+                await BroadcastToSession(sessionId.Value, new WsMessage
+                {
+                    Type = MessageType.UpdateParticipants,
+                    Payload = new
+                    {
+                        Participants = sessionResult.Participants,
+                    }
+                });
+            }
+            else
+            {
+                var session = await gameSessionService.GetGameSessionAsync(sessionId.Value, CancellationToken.None);
+
+                if (session == null || !session.IsActive)
+                    throw new Exception("Неверная сессия");
+            }
+        }
+
+        private async Task LeaveFromGame(bool isHost, Guid? sessionId, Guid userId)
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var gameSessionService = scope.ServiceProvider.GetRequiredService<IGameSessionService>();
+
             if (isHost)
             {
                 await gameSessionService.CloseGameSessionAsync(new CloseGameSessionParams { GameSessionId = sessionId.Value }, CancellationToken.None);
@@ -103,7 +118,8 @@ namespace BrainRing.Server.WebSockets
                 {
                     Type = MessageType.CloseGame
                 });
-            } else
+            }
+            else
             {
                 var sessionResult = await gameSessionService.LeaveGameSessionAsync(new LeaveGameSessionParams { UserId = userId, GameSessionId = sessionId.Value }, CancellationToken.None);
 
@@ -116,8 +132,6 @@ namespace BrainRing.Server.WebSockets
                     }
                 });
             }
-
-            await _manager.RemoveSocketAsync(socketId);
         }
 
         private async Task BroadcastToSession(Guid sessionId, WsMessage message)
@@ -141,7 +155,7 @@ namespace BrainRing.Server.WebSockets
             });
         }
 
-        private async Task HandleAnswer(IAnswerService answerService, Guid userId, Guid sessionId, object payload)
+        private async Task HandleAnswer(Guid userId, Guid sessionId, object payload)
         {
             var answerParams = JsonSerializer.Deserialize<BrainRing.Application.Params.Answer.SubmitAnswerParams>(payload.ToString());
 
@@ -149,6 +163,10 @@ namespace BrainRing.Server.WebSockets
 
             answerParams.UserId = userId;
             answerParams.GameSessionId = sessionId;
+
+            using var opScope = _scopeFactory.CreateScope();
+            
+            var answerService = opScope.ServiceProvider.GetRequiredService<IAnswerService>();
 
             var result = await answerService.SubmitAnswerAsync(answerParams);
 
@@ -167,12 +185,11 @@ namespace BrainRing.Server.WebSockets
 
             createPayload.GameSessionId = sessionId;
 
-            using (var opScope = _scopeFactory.CreateScope())
-            {
-                var questionService = opScope.ServiceProvider.GetRequiredService<IQuestionService>();
+            using var opScope = _scopeFactory.CreateScope(); 
 
-                await questionService.CreateQuestionAsync(createPayload);
-            }
+            var questionService = opScope.ServiceProvider.GetRequiredService<IQuestionService>();
+
+            await questionService.CreateQuestionAsync(createPayload);
 
             await BroadcastNewQuestion(sessionId, wsMessage.Payload);
         }
