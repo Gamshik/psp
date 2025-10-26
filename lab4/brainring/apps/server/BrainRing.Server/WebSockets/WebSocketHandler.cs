@@ -20,9 +20,9 @@ namespace BrainRing.Server.WebSockets
             _scopeFactory = scopeFactory;
         }
 
-        public async Task HandleConnectionAsync(WebSocket socket, Guid userId, Guid? sessionId = null)
+        public async Task HandleConnectionAsync(WebSocket socket, Guid userId, Guid? sessionId = null, bool isHost = false)
         {
-            var id = _manager.AddSocket(socket, userId, sessionId);
+            var socketId = _manager.AddSocket(socket, userId, sessionId);
 
             using var scope = _scopeFactory.CreateScope();
             var answerService = scope.ServiceProvider.GetRequiredService<IAnswerService>();
@@ -32,31 +32,35 @@ namespace BrainRing.Server.WebSockets
             {
                 try
                 {
-                    var joinParams = new JoinGameSessionParams
+                    if (!isHost)
                     {
-                        GameSessionId = sessionId.Value,
-                        UserId = userId
-                    };
-
-                    var sessionResult = await gameSessionService.JoinGameSessionAsync(joinParams);
-
-                    await BroadcastToSession(sessionId.Value, new WsMessage
-                    {
-                        Type = MessageType.NewParticipant,
-                        Payload = new
+                        var joinParams = new JoinGameSessionParams
                         {
-                            UserId = userId,
-                            Name = sessionResult.Participants.FirstOrDefault(p => p.Id == userId)?.Name
-                        }
-                    });
+                            GameSessionId = sessionId.Value,
+                            UserId = userId
+                        };
+
+                        var sessionResult = await gameSessionService.JoinGameSessionAsync(joinParams);
+
+                        await BroadcastToSession(sessionId.Value, new WsMessage
+                        {
+                            Type = MessageType.UpdateParticipants,
+                            Payload = new
+                            {
+                                Participants = sessionResult.Participants,
+                            }
+                        });
+                    } else
+                    {
+                        var session =  await gameSessionService.GetGameSessionAsync(sessionId.Value, CancellationToken.None);
+
+                        if (session == null || !session.IsActive)
+                            throw new Exception("Неверная сессия");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    await SendMessageAsync(socket, new WsMessage
-                    {
-                        Type = MessageType.Error,
-                        Payload = ex.Message
-                    });
+                    await _manager.RemoveSocketAsync(socketId);
                 }
             }
 
@@ -75,19 +79,7 @@ namespace BrainRing.Server.WebSockets
                     switch (wsMessage.Type)
                     {
                         case MessageType.NewQuestion:
-                            CreateQuestionParams createPayload = JsonSerializer.Deserialize<CreateQuestionParams>(wsMessage.Payload.ToString());
-                            createPayload.GameSessionId = sessionId.Value;
-
-                            using (var opScope = _scopeFactory.CreateScope())
-                            {
-                                var questionService = opScope.ServiceProvider.GetRequiredService<IQuestionService>();
-                                Console.WriteLine($"PAYLOAD: {questionService} {123} ");
-
-                                await questionService.CreateQuestionAsync(createPayload);
-
-                            }
-
-                            await BroadcastNewQuestion(sessionId!.Value, wsMessage.Payload);
+                            await HandleQuestion(sessionId.Value, wsMessage);
                             break;
 
                         case MessageType.AnswerResult:
@@ -103,8 +95,29 @@ namespace BrainRing.Server.WebSockets
                 result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
             }
 
-            await _manager.RemoveSocketAsync(id);
-            Console.WriteLine($"❌ Клиент {userId} отключён");
+            if (isHost)
+            {
+                await gameSessionService.CloseGameSessionAsync(new CloseGameSessionParams { GameSessionId = sessionId.Value }, CancellationToken.None);
+
+                await BroadcastToSession(sessionId.Value, new WsMessage
+                {
+                    Type = MessageType.CloseGame
+                });
+            } else
+            {
+                var sessionResult = await gameSessionService.LeaveGameSessionAsync(new LeaveGameSessionParams { UserId = userId, GameSessionId = sessionId.Value }, CancellationToken.None);
+
+                await BroadcastToSession(sessionId.Value, new WsMessage
+                {
+                    Type = MessageType.UpdateParticipants,
+                    Payload = new
+                    {
+                        Participants = sessionResult.Participants,
+                    }
+                });
+            }
+
+            await _manager.RemoveSocketAsync(socketId);
         }
 
         private async Task BroadcastToSession(Guid sessionId, WsMessage message)
@@ -131,6 +144,7 @@ namespace BrainRing.Server.WebSockets
         private async Task HandleAnswer(IAnswerService answerService, Guid userId, Guid sessionId, object payload)
         {
             var answerParams = JsonSerializer.Deserialize<BrainRing.Application.Params.Answer.SubmitAnswerParams>(payload.ToString());
+
             if (answerParams == null) return;
 
             answerParams.UserId = userId;
@@ -143,6 +157,24 @@ namespace BrainRing.Server.WebSockets
                 Type = MessageType.AnswerResult,
                 Payload = result
             });
+        }
+
+        private async Task HandleQuestion(Guid sessionId, WsMessage wsMessage)
+        {
+            CreateQuestionParams createPayload = JsonSerializer.Deserialize<CreateQuestionParams>(wsMessage.Payload.ToString());
+
+            if (createPayload == null) return;
+
+            createPayload.GameSessionId = sessionId;
+
+            using (var opScope = _scopeFactory.CreateScope())
+            {
+                var questionService = opScope.ServiceProvider.GetRequiredService<IQuestionService>();
+
+                await questionService.CreateQuestionAsync(createPayload);
+            }
+
+            await BroadcastNewQuestion(sessionId, wsMessage.Payload);
         }
 
         private async Task SendMessageAsync(WebSocket socket, WsMessage message)

@@ -24,7 +24,7 @@ namespace BrainRing.Server.Controllers
                 return Unauthorized();
 
             var session = await _gameSessionService.CreateGameSessionAsync(
-                new CreateGameSessionParams { HostId = userId, ParticipantIds = new List<Guid> { userId } });
+                new CreateGameSessionParams { HostId = userId });
 
             return Ok(new GameSessionDto
             {

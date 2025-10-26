@@ -21,9 +21,7 @@ namespace BrainRing.Application.Services
         {
             var session = new GameSession
             {
-                Id = Guid.NewGuid(),
                 HostId = @params.HostId,
-                Participants = @params.ParticipantIds.Select(id => new GameSessionUser { UserId = id }).ToList(),
                 IsActive = true
             };
 
@@ -34,10 +32,13 @@ namespace BrainRing.Application.Services
 
         public async Task<GameSessionResult> JoinGameSessionAsync(JoinGameSessionParams @params, CancellationToken token = default)
         {
-            var session = await _gameSessionRepo.FindByIdAsync(@params.GameSessionId, token, true);
+            var session = await _gameSessionRepo.FindByIdAsync(@params.GameSessionId, token, true, s => s.Participants);
 
             if (session == null || !session.IsActive)
                 throw new InvalidOperationException("Комната не найдена или не активна");
+
+            if (session.HostId == @params.UserId)
+                throw new InvalidOperationException("Это хост");
 
             if (session.Participants.Any(p => p.UserId == @params.UserId))
                 throw new InvalidOperationException("Пользователь уже в комнате");
@@ -49,24 +50,43 @@ namespace BrainRing.Application.Services
             return await MapToResultAsync(session);
         }
 
-        public async Task<GameSessionResult?> GetGameSessionAsync(Guid sessionId, CancellationToken token = default)
+        public async Task<GameSessionResult> LeaveGameSessionAsync(LeaveGameSessionParams @params, CancellationToken token = default)
         {
-            var session = await _gameSessionRepo.FindByIdAsync(sessionId, token, true);
-            if (session == null) return null;
+            var session = await _gameSessionRepo.FindByIdAsync(@params.GameSessionId, token, true, s => s.Participants);
+
+            if (session == null || !session.IsActive)
+                throw new InvalidOperationException("Комната не найдена или не активна");
+
+            var participant = session.Participants.FirstOrDefault(p => p.UserId == @params.UserId);
+
+            if (participant == null)
+                throw new InvalidOperationException("Пользователя нет в комнате");
+
+            session.Participants.Remove(participant);
+
+            await _gameSessionRepo.UpdateAsync(session, token);
 
             return await MapToResultAsync(session);
         }
 
-        public async Task<GameSessionResult?> NextQuestionAsync(Guid sessionId, CancellationToken token = default)
+        public async Task<GameSessionResult> CloseGameSessionAsync(CloseGameSessionParams @params, CancellationToken token = default)
         {
-            var session = await _gameSessionRepo.FindByIdAsync(sessionId, token, true);
-            if (session == null || !session.IsActive) return null;
+            var session = await _gameSessionRepo.FindByIdAsync(@params.GameSessionId, token, true, s => s.Participants);
 
-            var nextQuestion = session.Questions.FirstOrDefault(q => session.CurrentQuestionId == null || q.Id != session.CurrentQuestionId);
+            if (session == null || !session.IsActive)
+                throw new InvalidOperationException("Комната не найдена или не активна");
 
-            session.CurrentQuestionId = nextQuestion?.Id;
+            session.IsActive = false;
 
             await _gameSessionRepo.UpdateAsync(session, token);
+
+            return await MapToResultAsync(session);
+        }
+
+        public async Task<GameSessionResult?> GetGameSessionAsync(Guid sessionId, CancellationToken token = default)
+        {
+            var session = await _gameSessionRepo.FindByIdAsync(sessionId, token, true, s => s.Participants);
+            if (session == null) return null;
 
             return await MapToResultAsync(session);
         }

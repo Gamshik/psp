@@ -5,6 +5,7 @@
         NewQuestion = 0,
         AnswerResult = 1,
         Error = 2,
-        NewParticipant = 3
+        UpdateParticipants = 3,
+        CloseGame = 4,
     }
 }

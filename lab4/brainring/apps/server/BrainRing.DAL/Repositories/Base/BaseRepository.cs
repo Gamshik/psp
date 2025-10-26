@@ -111,7 +111,6 @@ namespace BrainRing.DbAdapter.Repositories.Base
                 var existingDbEntity = await _context.Set<Db>()
                     .FirstOrDefaultAsync(e => e.Id == entity.Id, cancellationToken);
 
-
                 if (existingDbEntity == null)
                     return null;
 

@@ -1,15 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import styles from "../game.module.scss";
-
-enum MessageType {
-  NewQuestion = 0,
-  AnswerResult = 1,
-  Error = 2,
-  NewParticipant = 3,
-}
+import { MessageTypes } from "../enums";
 
 interface Participant {
   Id: string;
@@ -21,11 +15,11 @@ interface Participant {
 interface Question {
   Text: string;
   Options: string[];
-  CorrectIndex?: number;
+  CorrectOptionIndex?: number;
 }
 
 interface WsMessage {
-  Type: MessageType;
+  Type: MessageTypes;
   Payload: any;
 }
 
@@ -36,6 +30,8 @@ export default function GamePage() {
   const [question, setQuestion] = useState<Question | null>(null);
   const [answered, setAnswered] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
+
+  const router = useRouter();
 
   useEffect(() => {
     if (!sessionId) return;
@@ -48,11 +44,15 @@ export default function GamePage() {
     socket.onmessage = (event) => {
       const msg: WsMessage = JSON.parse(event.data);
 
-      if (msg.Type === MessageType.NewQuestion) {
+      if (msg.Type === MessageTypes.NewQuestion) {
         setQuestion(msg.Payload);
         setAnswered(false);
-      } else if (msg.Type === MessageType.AnswerResult) {
+      } else if (msg.Type === MessageTypes.AnswerResult) {
         setParticipants(msg.Payload.Participants);
+      } else if (msg.Type === MessageTypes.UpdateParticipant) {
+        setParticipants(msg.Payload.Participants);
+      } else if (msg.Type === MessageTypes.CloseGame) {
+        router.push(`/`);
       }
     };
 
@@ -65,7 +65,7 @@ export default function GamePage() {
 
     ws.send(
       JSON.stringify({
-        Type: MessageType.AnswerResult,
+        Type: MessageTypes.AnswerResult,
         Payload: { SelectedOptionIndex: optionIdx },
       })
     );

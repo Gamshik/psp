@@ -37,8 +37,13 @@ namespace BrainRing.Server.Middlewares
                     sessionId = parsedSessionId;
                 }
 
+                bool isHost = false;
+                if (context.Request.Query.TryGetValue("isHost", out var isHostStr)) {
+                    _ = bool.TryParse(isHostStr, out isHost);
+                }
+
                 var socket = await context.WebSockets.AcceptWebSocketAsync();
-                await _handler.HandleConnectionAsync(socket, userId, sessionId);
+                await _handler.HandleConnectionAsync(socket, userId, sessionId, isHost);
             }
             else
             {

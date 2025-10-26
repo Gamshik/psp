@@ -1,31 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import styles from "../../game.module.scss";
-
-enum MessageType {
-  NewQuestion = 0,
-  AnswerResult = 1,
-  Error = 2,
-  NewParticipant = 3,
-}
+import { MessageTypes } from "../../enums";
 
 interface Participant {
   UserId: string;
   Name: string;
   Score: number;
-  Answered?: boolean;
-}
-
-interface Question {
-  Text: string;
-  Options: string[];
-  CorrectIndex?: number;
 }
 
 interface WsMessage {
-  Type: MessageType;
+  Type: MessageTypes;
   Payload: any;
 }
 
@@ -38,35 +25,29 @@ export default function HostPage() {
   const [correctIndex, setCorrectIndex] = useState<number>(0);
   const [ws, setWs] = useState<WebSocket | null>(null);
 
+  const router = useRouter();
+
   useEffect(() => {
     if (!sessionId) return;
 
     const socket = new WebSocket(
-      `ws://localhost:5000/ws?sessionId=${sessionId}`
+      `ws://localhost:5000/ws?sessionId=${sessionId}&isHost=true`
     );
     socket.onopen = () => console.log("✅ Connected as host");
 
     socket.onmessage = (event) => {
       const msg: WsMessage = JSON.parse(event.data);
 
-      if (msg.Type === MessageType.NewParticipant) {
-        setParticipants((prev) => {
-          const exists = prev.find((p) => p.UserId === msg.Payload.UserId);
-          console.log("PREV", prev, msg, exists);
-          if (exists) {
-            // обновляем существующего участника
-            return prev.map((p) =>
-              p.UserId === msg.Payload.UserId ? { ...p, ...msg.Payload } : p
-            );
-          } else {
-            // добавляем нового
-            return [...prev, msg.Payload];
-          }
-        });
-      } else if (msg.Type === MessageType.AnswerResult) {
+      if (msg.Type === MessageTypes.UpdateParticipant) {
+        setParticipants(msg.Payload.Participants);
+      } else if (msg.Type === MessageTypes.AnswerResult) {
         const updatedParticipants: Participant[] = msg.Payload.Participants;
         setParticipants(updatedParticipants);
       }
+    };
+
+    socket.onclose = (ev) => {
+      router.push(`/`);
     };
 
     setWs(socket);
@@ -77,7 +58,7 @@ export default function HostPage() {
     if (!ws) return;
     ws.send(
       JSON.stringify({
-        Type: MessageType.NewQuestion,
+        Type: MessageTypes.NewQuestion,
         Payload: {
           Text: questionText,
           Options: options,
@@ -99,8 +80,8 @@ export default function HostPage() {
         <h2>Участники</h2>
         <ul className={styles.participants_list}>
           {participants.map((p) => (
-            <li key={p.UserId} className={p.Answered ? "answered" : ""}>
-              {p.Name} — очки: {p.Score} {p.Answered ? "✅ Ответил" : ""}
+            <li key={p.UserId}>
+              {p.Name} — очки: {p.Score}{" "}
             </li>
           ))}
         </ul>

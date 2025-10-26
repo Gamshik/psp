@@ -19,25 +19,40 @@ namespace BrainRing.Application.Services
 
         public async Task<QuestionResult> CreateQuestionAsync(CreateQuestionParams @params, CancellationToken token = default)
         {
-            var session = await _gameSessionRepo.FindByIdAsync(@params.GameSessionId, token, true);
+            var session = await _gameSessionRepo.FindByIdAsync(@params.GameSessionId, token, true, [r => r.Questions, r => r.CurrentQuestion]);
+           
             if (session == null || !session.IsActive)
                 throw new InvalidOperationException("Сессия не найдена или не активна");
+
+            var last = session.Questions.FirstOrDefault(q => q.CurrentQuestions.Count > 0);
+
+            if (last != null)
+            {
+                last.CurrentQuestions = new List<GameSession>();
+                await _questionRepository.UpdateAsync(last, token);
+                
+                session = await _gameSessionRepo.FindByIdAsync(@params.GameSessionId, token, true, [r => r.Questions, r => r.CurrentQuestion]);
+
+            }
 
             var question = new Question
             {
                 GameSessionId = session.Id,
                 Text = @params.Text,
                 CorrectOptionIndex = @params.CorrectOptionIndex,
-                Options = @params.Options.Select(o => new QuestionOption { Id = Guid.NewGuid(), Title = o }).ToList()
+                Options = @params.Options.Select(o => new QuestionOption { Title = o }).ToList(),
+                CurrentQuestions = new List<GameSession>(),
             };
 
             var newQuestion = await _questionRepository.CreateAsync(question);
 
-            session.Questions.Add(newQuestion);
+            if (newQuestion == null)
+                throw new InvalidOperationException("Ошибка создания вопроса");
 
-            // Если это первый вопрос, сразу делаем его текущим
-            if (session.CurrentQuestionId == null)
-                session.CurrentQuestionId = question.Id;
+            newQuestion.CurrentQuestions.Add(session); 
+            await _questionRepository.SaveChangesAsync();
+
+            session.Questions.Add(newQuestion);
 
             await _gameSessionRepo.UpdateAsync(session, token);
 
