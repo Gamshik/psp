@@ -82,7 +82,7 @@ export default function GamePage() {
         <ul className={styles.participants_list}>
           {participants.map((p) => (
             <li key={p.Id} className={p.Answered ? "answered" : ""}>
-              {p.Name} — очки: {p.Score} {p.Answered ? "✅ Ответил" : ""}
+              {p.Name} — очки: {p.Score} {p.Answered ? "Ответил" : ""}
             </li>
           ))}
         </ul>

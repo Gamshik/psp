@@ -32,7 +32,6 @@ namespace BrainRing.Application.Services
                 await _questionRepository.UpdateAsync(last, token);
                 
                 session = await _gameSessionRepo.FindByIdAsync(@params.GameSessionId, token, true, [r => r.Questions, r => r.CurrentQuestion]);
-
             }
 
             var question = new Question
